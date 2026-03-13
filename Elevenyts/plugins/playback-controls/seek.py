@@ -1,23 +1,7 @@
-# ==============================================================================
-# seek.py - Seek to Timestamp Command
-# ==============================================================================
-# This plugin allows seeking to a specific timestamp in the current track.
-#
-# Commands:
-# - /seek <seconds> - Seek forward to timestamp
-# - /seekback <seconds> - Seek backward to timestamp
-#
-# Requirements:
-# - User must be admin or authorized user
-# - Music must be playing (not paused)
-# - Track must have a known duration (not live streams)
-# - Minimum seek: 10 seconds
-# ==============================================================================
-
 from pyrogram import filters, types
 
-from HasiiMusic import tune, app, db, lang, queue
-from HasiiMusic.helpers import can_manage_vc
+from Elevenyts import tune, app, db, lang, queue
+from Elevenyts.helpers import can_manage_vc
 
 
 @app.on_message(filters.command(["seek", "seekback"]) & filters.group & ~app.bl_users)
