@@ -22,7 +22,7 @@ logging.getLogger("pymongo").setLevel(logging.ERROR)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
 logging.getLogger("pytgcalls").setLevel(logging.ERROR)
 
-logger = logging.getLogger("HasiiMusic")
+logger = logging.getLogger("Elevenyts")
 
 # Version
 __version__ = "3.0.1"
