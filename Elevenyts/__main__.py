@@ -1,6 +1,9 @@
 import asyncio
 import importlib
+import os
 import sys
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from pyrogram import idle
 
@@ -21,21 +24,57 @@ from Elevenyts import (tune, app, config, db,
 from Elevenyts.plugins import all_modules
 
 
+# HTTP Server for Render health checks
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    """Simple HTTP handler for Render health checks"""
+    
+    def do_GET(self):
+        """Handle GET requests"""
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b'Bot is running')
+    
+    def log_message(self, format, *args):
+        """Suppress log messages to keep console clean"""
+        pass
+
+
+def run_http_server():
+    """Run a simple HTTP server for Render health checks"""
+    port = int(os.environ.get("PORT", 8000))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    logger.info(f"🌐 HTTP health check server started on port {port}")
+    server.serve_forever()
+
+
 async def main():
     try:
-        # Step 1: Connect to MongoDB database
+        # Step 1: Validate required environment variables
+        try:
+            config.check()
+        except SystemExit as e:
+            logger.error(str(e))
+            return
+
+        # Step 2: Start HTTP server in a separate thread (for Render)
+        http_thread = threading.Thread(target=run_http_server, daemon=True)
+        http_thread.start()
+        logger.info("🌐 HTTP server thread started for Render health checks")
+
+        # Step 3: Connect to MongoDB database
         await db.connect()
         
-        # Step 2: Start the main bot client
+        # Step 4: Start the main bot client
         await app.boot()
         
-        # Step 3: Start assistant/userbot clients (for joining voice chats)
+        # Step 5: Start assistant/userbot clients (for joining voice chats)
         await userbot.boot()
         
-        # Step 4: Initialize voice call handler
+        # Step 6: Initialize voice call handler
         await tune.boot()
 
-        # Step 5: Load all plugin modules (commands like /play, /pause, etc.)
+        # Step 7: Load all plugin modules (commands like /play, /pause, etc.)
         for module in all_modules:
             try:
                 importlib.import_module(f"Elevenyts.plugins.{module}")
@@ -43,14 +82,7 @@ async def main():
                 logger.error(f"Failed to load plugin {module}: {e}", exc_info=True)
         logger.info(f"🔌 Loaded {len(all_modules)} plugin modules.")
 
-        # Step 6: Download YouTube cookies if URLs are provided (for age-restricted videos)
-        if config.COOKIES_URL:
-            try:
-                await yt.save_cookies(config.COOKIES_URL)
-            except Exception as e:
-                logger.error(f"Failed to download cookies: {e}")
-
-        # Step 7: Load sudo users and blacklisted users from database
+        # Step 8: Load sudo users and blacklisted users from database
         sudoers = await db.get_sudoers()
         app.sudoers.update(sudoers)  # Add sudo users to set
         app.sudo_filter.update(sudoers)  # Add sudo users to filter
@@ -58,7 +90,7 @@ async def main():
         logger.info(f"👑 Loaded {len(app.sudoers)} sudo users.")
         logger.info("\n🎉 Bot started successfully! Ready to play music! 🎵\n")
 
-        # Step 8: Keep the bot running (press Ctrl+C to stop)
+        # Step 9: Keep the bot running (press Ctrl+C to stop)
         try:
             await idle()
         except KeyboardInterrupt:
@@ -66,7 +98,7 @@ async def main():
         except Exception as e:
             logger.error(f"Error during idle: {e}", exc_info=True)
         
-        # Step 9: Cleanup and shutdown when bot is stopped
+        # Step 10: Cleanup and shutdown when bot is stopped
         await stop()
     except Exception as e:
         logger.error(f"Critical error in main: {e}", exc_info=True)
@@ -88,6 +120,7 @@ if __name__ == "__main__":
     finally:
         # Ensure cleanup happens
         try:
+            loop = asyncio.get_event_loop()
             if loop.is_running():
                 loop.stop()
         except:
