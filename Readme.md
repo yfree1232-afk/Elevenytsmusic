@@ -7,6 +7,7 @@
   
   [![Telegram](https://img.shields.io/badge/Telegram-Channel-blue?style=for-the-badge&logo=telegram)](https://t.me/elevenyts)
   [![Telegram](https://img.shields.io/badge/Telegram-Support-blue?style=for-the-badge&logo=telegram)](https://t.me/elevenytsmusic)
+  [![Telegram](https://img.shields.io/badge/String-Session-blue?style=for-the-badge&logo=telegram)](https://t.me/genStringbot)
   
 </div>
 
