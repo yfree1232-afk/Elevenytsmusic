@@ -57,7 +57,7 @@ class Config:
 
         # ============ SUPPORT LINKS ============
         self.SUPPORT_CHANNEL: str = getenv(
-            "SUPPORT_CHANNEL", "https://t.me/elevenyts")
+            "SUPPORT_CHANNEL", "https://t.me/elevenytschats")
         self.SUPPORT_CHAT: str = getenv("SUPPORT_CHAT", "https://t.me/elevenytsmusic")
 
         # ============ EXCLUDED CHATS ============
