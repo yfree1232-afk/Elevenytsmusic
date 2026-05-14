@@ -17,6 +17,8 @@ class YouTube:
     def __init__(self):
         """Initialize YouTube handler with API configuration."""
         self.base = "https://www.youtube.com/watch?v="  # Base YouTube URL
+        # CHANGE THIS IN YOUR config.py
+        # Add this line in config.py: YOUTUBE_API_URL = "https://youtube-search-python-production-d9c3.up.railway.app"
         self.api_url = config.YOUTUBE_API_URL  # API URL for downloads
 
         # Regular expression to match YouTube URLs (videos, shorts, playlists)
@@ -206,15 +208,19 @@ class YouTube:
 
     async def _download_via_api(self, video_id: str, video: bool = False) -> Optional[str]:
         """
-        Download audio/video using external API.
-        This replaces the cookie-based yt-dlp approach.
+        Download audio/video using Railway API.
+        This bypasses age restrictions and cookie problems.
         """
         file_type = "video" if video else "audio"
         ext = "mp4" if video else "mp3"
+        
+        # Construct full YouTube URL
+        video_url = self.base + video_id
         file_path = os.path.join("downloads", f"{video_id}.{ext}")
 
         # Check if file already exists
         if os.path.exists(file_path):
+            logger.info(f"✅ Using cached {file_type}: {video_id}")
             return file_path
 
         # Ensure downloads directory exists
@@ -229,62 +235,60 @@ class YouTube:
 
         try:
             async with aiohttp.ClientSession() as session:
-                # First, get download token
-                params = {"url": video_id, "type": file_type}
+                # Use Railway API's /api/direct endpoint
+                params = {
+                    "url": video_url,  # Send full YouTube URL
+                    "type": file_type
+                }
+                
+                logger.info(f"📥 Downloading {file_type} from API: {video_id}")
                 
                 async with session.get(
-                    f"{self.api_url}/download",
+                    f"{self.api_url}/api/direct",  # Note: /api/direct endpoint
                     params=params,
-                    timeout=aiohttp.ClientTimeout(total=7)
+                    timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
                     if response.status != 200:
                         logger.error(f"❌ API request failed: HTTP {response.status}")
                         return None
 
                     data = await response.json()
-                    download_token = data.get("download_token")
                     
-                    if not download_token:
-                        logger.error("❌ No download token received from API")
-                        return None
-                    
-                    # Download the file
-                    stream_url = f"{self.api_url}/stream/{video_id}?type={file_type}&token={download_token}"
-                    
-                    async with session.get(
-                        stream_url,
-                        timeout=aiohttp.ClientTimeout(total=300 if video else 300)
-                    ) as file_response:
-                        if file_response.status == 302:
-                            # Handle redirect
-                            redirect_url = file_response.headers.get('Location')
-                            if redirect_url:
-                                async with session.get(redirect_url) as final_response:
-                                    if final_response.status != 200:
-                                        logger.error(f"❌ Redirect failed: HTTP {final_response.status}")
-                                        return None
-                                    with open(file_path, "wb") as f:
-                                        async for chunk in final_response.content.iter_chunked(16384):
-                                            f.write(chunk)
-                        elif file_response.status == 200:
-                            # Direct download
+                    # Check if API returned direct stream URL
+                    if data.get("success") and data.get("stream_url"):
+                        stream_url = data["stream_url"]
+                        logger.info(f"✅ Got stream URL, downloading {file_type}...")
+                        
+                        # Download the file from stream URL
+                        async with session.get(
+                            stream_url,
+                            timeout=aiohttp.ClientTimeout(total=300 if video else 300)
+                        ) as file_response:
+                            if file_response.status != 200:
+                                logger.error(f"❌ Download failed: HTTP {file_response.status}")
+                                return None
+                            
+                            # Write file in chunks
                             with open(file_path, "wb") as f:
                                 async for chunk in file_response.content.iter_chunked(16384):
                                     f.write(chunk)
-                        else:
-                            logger.error(f"❌ Download failed: HTTP {file_response.status}")
-                            return None
-                        
-                        # Verify file was downloaded
-                        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                            logger.info(f"✅ Downloaded: {video_id}.{ext}")
-                            return file_path
-                        else:
-                            logger.error(f"❌ Downloaded file is empty or missing: {file_path}")
-                            return None
+                            
+                            # Verify file was downloaded
+                            if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+                                logger.info(f"✅ Downloaded {file_type}: {video_id}.{ext} ({os.path.getsize(file_path)} bytes)")
+                                return file_path
+                            else:
+                                logger.error(f"❌ Downloaded file is empty or missing: {file_path}")
+                                return None
+                    else:
+                        logger.error(f"❌ API error: {data.get('error', 'Unknown error')}")
+                        return None
 
         except asyncio.TimeoutError:
             logger.error(f"❌ Download timeout for {video_id}")
+            return None
+        except aiohttp.ClientError as e:
+            logger.error(f"❌ Network error for {video_id}: {e}")
             return None
         except Exception as e:
             logger.error(f"❌ Download error for {video_id}: {e}")
