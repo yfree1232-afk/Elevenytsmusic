@@ -1,3 +1,3 @@
-worker: python main.py
+worker: python3 -m Music
 
 
