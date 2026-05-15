@@ -1,2 +1,3 @@
-worker: python session.py
+worker: python main.py
+
 
