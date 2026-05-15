@@ -1,1 +1,2 @@
-python session.py
+worker: python session.py
+
